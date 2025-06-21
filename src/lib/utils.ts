@@ -192,65 +192,30 @@ export async function* streamChatResponse(
 ): AsyncGenerator<string, void, unknown> {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
-  
+  let partialLine = '';
+
   try {
     while (true) {
       const { done, value } = await reader.read();
-      
-      if (done) {
-        break;
-      }
-      
-      try {
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk
-          .split('\n')
-          .filter((line) => line.trim() !== '');
-        
-        for (const line of lines) {
-          try {
-            // Skip ping events
-            if (line.includes('event: ping')) continue;
-            
-            // Skip [DONE] markers (from any provider)
-            if (line.includes('[DONE]')) continue;
-            
-            // Handle Claude API specific events
-            if (line.startsWith('event:')) continue;
-            
-            // Extract the data part
-            if (!line.startsWith('data:')) continue;
-            
-            const trimmedLine = line.startsWith('data: ') ? line.slice(6) : line;
-            if (trimmedLine.trim() === '') continue;
-            
-            const data = JSON.parse(trimmedLine);
-            
-            // Handle Neura format
-            if (data.chunk !== undefined) {
-              yield data.chunk;
-            }
-            // Handle Claude API format
-            else if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
-              yield data.delta.text;
-            }
-            // Handle OpenAI format
-            else if (data.choices && data.choices[0]?.delta?.content) {
-              yield data.choices[0].delta.content;
-            }
-            // Handle non-streaming format
-            else if (data.choices && data.choices[0]?.message?.content) {
-              yield data.choices[0].message.content;
-            }
-          } catch (e) {
-            // Skip invalid JSON lines
-            console.warn('Skipping invalid JSON in stream:', line);
-          }
-        }
-      } catch (e) {
-        console.error('Error processing stream chunk:', e);
+      if (done) break;
+
+      const chunk = decoder.decode(value, { stream: true });
+      partialLine += chunk;
+
+      const lines = partialLine.split('\n');
+      partialLine = lines.pop() || ''; // Последняя строка может быть неполной
+
+      for (const line of lines) {
+        const trimmed = line.replace(/^data:\s*/, '').trim();
+
+        if (!trimmed || trimmed === '[DONE]') continue;
+
+        // Здесь мы НЕ парсим как JSON, потому что local-ai просто возвращает текст
+        yield trimmed;
       }
     }
+  } catch (e) {
+    console.error('Error processing stream chunk:', e);
   } finally {
     reader.releaseLock();
   }

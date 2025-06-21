@@ -1,4 +1,4 @@
-import { ChatRequest, ChatResponse } from '@/types';
+import { ChatRequest, ChatResponse } from "@/types";
 import { generateId } from "@/lib/utils";
 
 /**
@@ -10,24 +10,24 @@ export async function sendNeuraRequest(
   chatRequest: ChatRequest
 ): Promise<ChatResponse | ReadableStream<Uint8Array>> {
   const headers: HeadersInit = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${apiKey}`,
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${apiKey}`,
   };
 
   try {
     // Always request streaming from the API
     const apiRequest = {
       messages: chatRequest.messages.map((msg) => ({
-        role: msg.role === 'system' ? 'user' : msg.role,
+        role: msg.role === "system" ? "user" : msg.role,
         content: msg.content,
       })),
-      model: chatRequest.model || 'neurarouter-default',
+      model: chatRequest.model || "neurarouter-default",
       temperature: chatRequest.temperature,
       stream: true, // Always stream from API
     };
 
     const response = await fetch(apiUrl, {
-      method: 'POST',
+      method: "POST",
       headers,
       body: JSON.stringify(apiRequest),
     });
@@ -63,36 +63,39 @@ export async function sendNeuraRequest(
       // For non-streaming requests, collect all chunks and return a complete response
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-      let fullContent = '';
-      
+      let fullContent = "";
+
       try {
         while (true) {
           const { done, value } = await reader.read();
-          
+
           if (done) {
             break;
           }
-          
+
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk
-            .split('\n')
-            .filter((line) => line.trim() !== '');
-          
+          const lines = chunk.split("\n").filter((line) => line.trim() !== "");
+
           for (const line of lines) {
             try {
               // Skip ping events, [DONE] markers, and events
-              if (line.includes('event: ping') || 
-                  line.includes('[DONE]') || 
-                  line.startsWith('event:')) continue;
-              
+              if (
+                line.includes("event: ping") ||
+                line.includes("[DONE]") ||
+                line.startsWith("event:")
+              )
+                continue;
+
               // Extract the data part
-              if (!line.startsWith('data:')) continue;
-              
-              const trimmedLine = line.startsWith('data: ') ? line.slice(6) : line;
-              if (trimmedLine.trim() === '') continue;
-              
+              if (!line.startsWith("data:")) continue;
+
+              const trimmedLine = line.startsWith("data: ")
+                ? line.slice(6)
+                : line;
+              if (trimmedLine.trim() === "") continue;
+
               const data = JSON.parse(trimmedLine);
-              
+
               // Handle Neura format
               if (data.chunk !== undefined) {
                 fullContent += data.chunk;
@@ -103,31 +106,31 @@ export async function sendNeuraRequest(
               }
             } catch (e) {
               // Skip invalid JSON lines
-              console.warn('Skipping invalid JSON in stream:', line);
+              console.warn("Skipping invalid JSON in stream:", line);
             }
           }
         }
       } finally {
         reader.releaseLock();
       }
-      
+
       // Return a complete response with the accumulated content
       return {
-        id: generateId(),
+        id: uuidv4(),
         choices: [
           {
             index: 0,
             message: {
-              role: 'assistant',
-              content: fullContent
+              role: "assistant",
+              content: fullContent,
             },
-            finish_reason: 'stop'
-          }
-        ]
+            finish_reason: "stop",
+          },
+        ],
       };
     }
   } catch (error) {
-    console.error('Error in Neura API request:', error);
+    console.error("Error in Neura API request:", error);
     throw error;
   }
 }
