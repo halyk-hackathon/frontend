@@ -85,6 +85,7 @@ export function Header({ className, arenaMode }: HeaderProps) {
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
+              <Link to="/notifications">
               <Button
                 variant="ghost"
                 size="icon"
@@ -100,7 +101,7 @@ export function Header({ className, arenaMode }: HeaderProps) {
                 ) : (
                   <Bell className="h-5 w-5" />
                 )}
-              </Button>
+              </Button></Link>
             </TooltipTrigger>
             <TooltipContent side="bottom">
               <p>

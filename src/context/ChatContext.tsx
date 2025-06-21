@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { Conversation, Message, Settings, Provider, Template, ChatResponse, ChatRequest } from '@/types';
-import { generateId, getDefaultSettings, getFirstMessage, getDefaultArenaSettings } from '@/lib/utils';
+import { generateId, getDefaultSettings, getFirstMessage, getDefaultArenaSettings, cleanAndFixText } from '@/lib/utils';
 import { useToast } from "@/hooks/use-toast";
 import { sendChatRequest } from "@/services/apiService";
 import { streamChatResponse } from "@/lib/utils";
@@ -520,7 +520,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
 
             // Accumulate the chunk content
             responseContent += chunk;
-            
+            const cleaned = cleanAndFixText(responseContent);
+
             // Update the message with the current content and recalculate token count
             const words = responseContent
               .trim()
@@ -537,7 +538,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
                         msg.id === assistantMessage.id
                           ? { 
                               ...msg, 
-                              content: responseContent, // Use accumulated content
+                              content: cleaned, // Use accumulated content
                               tokenCount: words.length 
                             }
                           : msg
@@ -644,7 +645,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       console.error("Error sending message:", error);
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to send message",
+        description: error instanceof Error ? error.message : "Не удалось отправить сообщение.",
         variant: "destructive",
       });
       
@@ -652,7 +653,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
       const errorMessage: Message = {
         id: generateId(),
         role: 'assistant',
-        content: "Sorry, I encountered an error. Please try again.",
+        content: "Извините, произошла ошибка. Попробуйте еще раз.",
         createdAt: new Date(),
         tokenCount: 10
       };

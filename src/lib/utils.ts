@@ -71,7 +71,7 @@ export function getFirstMessage(message?: string): string {
   if (message) return message;
   
   // Otherwise, get from environment variable or use fallback
-  return import.meta.env.DEFAULT_WELCOME_MESSAGE || "Hello! I'm your AI assistant. How can I help you today?";
+  return import.meta.env.DEFAULT_WELCOME_MESSAGE || "Здравствуйте! Я ваш помощник-ИИ. Чем я могу вам помочь сегодня?";
 }
 
 export function getApiUrlForProvider(provider: Provider): string {
@@ -193,6 +193,7 @@ export async function* streamChatResponse(
   const reader = stream.getReader();
   const decoder = new TextDecoder();
   let partialLine = '';
+  let fullText = '';
 
   try {
     while (true) {
@@ -203,20 +204,36 @@ export async function* streamChatResponse(
       partialLine += chunk;
 
       const lines = partialLine.split('\n');
-      partialLine = lines.pop() || ''; // Последняя строка может быть неполной
+      partialLine = lines.pop() || '';
 
       for (const line of lines) {
-        const trimmed = line.replace(/^data:\s*/, '').trim();
+        const cleanedLine = line.replace(/^data:\s*/, '').trim();
+        if (!cleanedLine || cleanedLine === '[DONE]') continue;
 
-        if (!trimmed || trimmed === '[DONE]') continue;
-
-        // Здесь мы НЕ парсим как JSON, потому что local-ai просто возвращает текст
-        yield trimmed;
+        fullText += cleanedLine;
       }
     }
+
+    // 🔥 Только здесь удаляем <think>...</think> и вставляем пробелы
+    const cleaned = cleanAndFixText(fullText);
+    yield cleaned;
+
   } catch (e) {
     console.error('Error processing stream chunk:', e);
   } finally {
     reader.releaseLock();
   }
+}
+
+export function cleanAndFixText(rawText: string): string {
+  const withoutThink = rawText.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  return insertSpaces(withoutThink).trim();
+}
+
+export function insertSpaces(text: string): string {
+  return text
+    .replace(/([а-я])([А-Я])/g, '$1 $2')   // между русскими
+    .replace(/([a-z])([A-Z])/g, '$1 $2')   // между английскими
+    .replace(/([а-яА-Яa-zA-Z])([0-9])/g, '$1 $2') // буква + цифра
+    .replace(/([0-9])([а-яА-Яa-zA-Z])/g, '$1 $2'); // цифра + буква
 }
