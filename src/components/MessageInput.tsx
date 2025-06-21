@@ -129,31 +129,23 @@ export function MessageInput({ className, arenaMode }: MessageInputProps) {
 
       setMessage("");
 
-      const messages = [];
+     const messages = [];
 
-      if (settings.systemPrompt?.trim()) {
-        messages.push({ role: "system", content: settings.systemPrompt });
-      }
+if (settings.systemPrompt?.trim()) {
+  messages.push({ role: "system", content: settings.systemPrompt });
+}
 
-      messages.push(
-        ...conversation.messages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        })),
-        { role: "user", content: userMessage }
-      );
+messages.push({ role: "user", content: userMessage });
 
-      const chatRequest = {
-        messages,
-        model: "local-ai",
-        temperature: settings.temperature,
-        stream: settings.streamEnabled,
-      };
+const chatRequest = {
+  messages,
+  model: "openai/gpt-3.5-turbo",
+  temperature: settings.temperature,
+  stream: settings.streamEnabled,
+};
 
-      const response = await sendChatRequest("local-ai", {
-        role: "user",
-        content: userMessage,
-      });
+const response = await sendChatRequest("local-ai", chatRequest);
+
 
       if (settings.streamEnabled && response instanceof ReadableStream) {
         const assistantMessage = {

@@ -4,7 +4,12 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Copy, ArrowDown } from "lucide-react";
 import { countTokens } from "@/lib/tokenizer";
 import { useToast } from "@/hooks/use-toast";
@@ -26,29 +31,29 @@ export function MessageList({ conversation, className }: MessageListProps) {
   const previousStreamingRef = useRef(isStreaming);
   const userScrolledRef = useRef(false);
   const { toast } = useToast();
-  
+
   // Get theme styles
   const { template } = useTheme();
-  
+
   const getButtonStyle = () => {
     switch (template) {
-      case 'vibrant':
-        return 'bg-[#8B5CF6] hover:bg-[#7C3AED] text-white';
-      case 'elegant':
-        return 'bg-[#0891B2] hover:bg-[#0E7490] text-white';
-      case 'minimal':
+      case "vibrant":
+        return "bg-[#8B5CF6] hover:bg-[#7C3AED] text-white";
+      case "elegant":
+        return "bg-[#0891B2] hover:bg-[#0E7490] text-white";
+      case "minimal":
       default:
-        return 'bg-primary text-primary-foreground hover:bg-primary/90';
+        return "bg-primary text-primary-foreground ";
     }
   };
-  
+
   // Simple scroll to bottom function
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     setShowButton(false);
     userScrolledRef.current = false;
   }, []);
-  
+
   // Only scroll to bottom when a new message is added (not during streaming)
   useEffect(() => {
     if (!isStreaming) {
@@ -60,29 +65,33 @@ export function MessageList({ conversation, className }: MessageListProps) {
   useEffect(() => {
     const handleScroll = () => {
       if (!scrollAreaRef.current) return;
-      
+
       // We're targeting the parent element which contains the shadcn ScrollArea
-      const viewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      const viewport = scrollAreaRef.current.querySelector(
+        "[data-radix-scroll-area-viewport]"
+      );
       if (!viewport) return;
-      
+
       const { scrollTop, scrollHeight, clientHeight } = viewport as HTMLElement;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-      
+
       // Consider the user has scrolled up if they're more than 100px from bottom
       userScrolledRef.current = distanceFromBottom > 100;
-      
+
       // Show button only when scrolled up (more than 100px from bottom)
       setShowButton(distanceFromBottom > 100);
     };
-    
+
     // Find the element and attach listener
-    const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    const scrollElement = scrollAreaRef.current?.querySelector(
+      "[data-radix-scroll-area-viewport]"
+    );
     if (scrollElement) {
-      scrollElement.addEventListener('scroll', handleScroll);
-      return () => scrollElement.removeEventListener('scroll', handleScroll);
+      scrollElement.addEventListener("scroll", handleScroll);
+      return () => scrollElement.removeEventListener("scroll", handleScroll);
     }
   }, []);
-  
+
   // Detect when streaming ends and scroll to bottom if user hasn't scrolled up
   useEffect(() => {
     // Check if streaming just ended
@@ -95,64 +104,72 @@ export function MessageList({ conversation, className }: MessageListProps) {
         }, 100);
       }
     }
-    
+
     // Update ref for next check
     previousStreamingRef.current = isStreaming;
   }, [isStreaming]);
 
   // Handle editing a message
-  const handleEditMessage = useCallback((messageId: string, newContent: string) => {
-    // Find the edited message index
-    const messageIndex = conversation.messages.findIndex(msg => msg.id === messageId);
-    if (messageIndex === -1) return;
-    
-    // Get the message that was edited
-    const editedMessage = conversation.messages[messageIndex];
-    
-    // Make sure it's a user message
-    if (editedMessage.role !== "user") {
+  const handleEditMessage = useCallback(
+    (messageId: string, newContent: string) => {
+      // Find the edited message index
+      const messageIndex = conversation.messages.findIndex(
+        (msg) => msg.id === messageId
+      );
+      if (messageIndex === -1) return;
+
+      // Get the message that was edited
+      const editedMessage = conversation.messages[messageIndex];
+
+      // Make sure it's a user message
+      if (editedMessage.role !== "user") {
+        toast({
+          title: "Cannot edit assistant messages",
+          description: "Only your messages can be edited.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Calculate the context window based on settings
+      const messageCount = settings.contextWindowSize * 2; // Each pair has 2 messages
+      const contextStartIndex = Math.max(0, messageIndex - messageCount);
+      const contextEndIndex = messageIndex;
+
+      // Get the context messages
+      const contextMessages = conversation.messages.slice(
+        contextStartIndex,
+        contextEndIndex
+      );
+
+      // Send the edited message to regenerate the response.
+      // ChatContext's sendMessage will handle slicing the conversation
+      // history and preparing the correct context based on the editedMessageIndex.
+      sendMessage(newContent, undefined, messageIndex);
+
       toast({
-        title: "Cannot edit assistant messages",
-        description: "Only your messages can be edited.",
-        variant: "destructive"
+        title: "Message edited",
+        description: "Regenerating response based on your edit...",
       });
-      return;
-    }
-    
-    // Calculate the context window based on settings
-    const messageCount = settings.contextWindowSize * 2; // Each pair has 2 messages
-    const contextStartIndex = Math.max(0, messageIndex - messageCount);
-    const contextEndIndex = messageIndex;
-    
-    // Get the context messages
-    const contextMessages = conversation.messages.slice(contextStartIndex, contextEndIndex);
-    
-    // Send the edited message to regenerate the response.
-    // ChatContext's sendMessage will handle slicing the conversation
-    // history and preparing the correct context based on the editedMessageIndex.
-    sendMessage(newContent, undefined, messageIndex);
-    
-    toast({
-      title: "Message edited",
-      description: "Regenerating response based on your edit...",
-    });
-  }, [conversation.messages, sendMessage, toast, settings]);
+    },
+    [conversation.messages, sendMessage, toast, settings]
+  );
 
   return (
     <div className="relative h-full" ref={scrollAreaRef}>
       <ScrollArea className={cn("h-full custom-scrollbar", className)}>
         <div className="flex flex-col p-4 pb-24">
           {conversation.messages.map((message) => (
-            <Message 
-              key={message.id} 
-              message={message} 
+            <Message
+              key={message.id}
+              message={message}
               onEditMessage={handleEditMessage}
             />
           ))}
           <div ref={messagesEndRef} className="h-1" />
         </div>
       </ScrollArea>
-      
+
       {showButton && (
         <Button
           className={cn(
@@ -176,7 +193,7 @@ interface MessageProps {
   onEditMessage?: (messageId: string, newContent: string) => void;
 }
 
-function Message({ message, onEditMessage }: MessageProps) {
+export function Message({ message, onEditMessage }: MessageProps) {
   const isUser = message.role === "user";
   const [isHovered, setIsHovered] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -185,9 +202,40 @@ function Message({ message, onEditMessage }: MessageProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
-  
-  // Use the tokenCount from the message object or calculate it if not available
+
   const tokenCount = message.tokenCount || countTokens(message.content);
+
+  // JSON DETECTOR
+  const [jsonObject, setJsonObject] = useState<Record<string, any> | null>(
+    null
+  );
+
+  useEffect(() => {
+    try {
+      const trimmed = message.content.trim();
+      const cleaned = trimmed.replace(/“|”/g, '"');
+      const parsed = JSON.parse(cleaned);
+      if (typeof parsed === "object" && parsed !== null) {
+        setJsonObject(parsed);
+      }
+    } catch {
+      setJsonObject(null);
+    }
+  }, [message.content]);
+
+  const renderJsonBlock = (json: Record<string, any>) => (
+    <div className="rounded-lg border p-6 bg-card max-w-xl w-full mx-auto my-6 shadow-md">
+      <h3 className="text-xl font-semibold mb-4">📦 Данные</h3>
+      <div className="space-y-2">
+        {Object.entries(json).map(([key, value]) => (
+          <div key={key} className="text-sm">
+            <strong>{key}:</strong> {String(value)}
+          </div>
+        ))}
+      </div>
+      <Button className="w-full mt-6 h-10 text-base">Подписать</Button>
+    </div>
+  );
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(message.content);
@@ -198,20 +246,18 @@ function Message({ message, onEditMessage }: MessageProps) {
     });
   };
 
-  // Handle starting edit mode
   const handleEdit = () => {
     setEditedContent(message.content);
     setIsEditing(true);
-    // Focus the textarea after it's rendered
     setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(message.content.length, message.content.length);
-      }
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(
+        message.content.length,
+        message.content.length
+      );
     }, 50);
   };
 
-  // Handle saving the edit
   const handleSaveEdit = () => {
     if (onEditMessage && editedContent.trim() !== message.content.trim()) {
       onEditMessage(message.id, editedContent);
@@ -219,25 +265,22 @@ function Message({ message, onEditMessage }: MessageProps) {
     setIsEditing(false);
   };
 
-  // Handle canceling the edit
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditedContent(message.content);
   };
 
-  // Handle keyboard shortcuts for saving/canceling
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       handleSaveEdit();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       handleCancelEdit();
     }
   };
 
-  // Add audio playback functions
   const toggleAudio = () => {
     if (!audioRef.current || !message.audioUrl) return;
-    
+
     if (isPlaying) {
       audioRef.current.pause();
     } else {
@@ -250,13 +293,13 @@ function Message({ message, onEditMessage }: MessageProps) {
     setIsPlaying(false);
   };
 
-  const handleAudioError = (e: React.SyntheticEvent<HTMLAudioElement, Event>) => {
+  const handleAudioError = (e: SyntheticEvent<HTMLAudioElement, Event>) => {
     console.error("Audio playback error:", e);
     setIsPlaying(false);
     toast({
       title: "Audio playback error",
       description: "Could not play this audio message",
-      variant: "destructive"
+      variant: "destructive",
     });
   };
 
@@ -276,7 +319,7 @@ function Message({ message, onEditMessage }: MessageProps) {
             <AvatarImage src="/assistant-avatar.png" />
           </Avatar>
         )}
-        
+
         <div className="relative max-w-[calc(100%-8rem)]">
           <div
             className={cn(
@@ -284,8 +327,7 @@ function Message({ message, onEditMessage }: MessageProps) {
               isUser
                 ? "bg-primary text-primary-foreground"
                 : "bg-secondary text-secondary-foreground",
-              "w-full break-words",
-              "overflow-x-hidden" // Prevent horizontal overflow
+              "w-full break-words overflow-x-hidden"
             )}
           >
             {isEditing && isUser ? (
@@ -299,23 +341,16 @@ function Message({ message, onEditMessage }: MessageProps) {
                   placeholder="Edit your message..."
                 />
                 <div className="flex justify-end mt-2 space-x-2">
-                  <Button 
-                    size="sm" 
-                    onClick={handleCancelEdit}
-                  >
+                  <Button size="sm" onClick={handleCancelEdit}>
                     Cancel
                   </Button>
-                  <Button 
-                    size="sm" 
-                    onClick={handleSaveEdit}
-                  >
+                  <Button size="sm" onClick={handleSaveEdit}>
                     Save
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="text-sm overflow-hidden">
-                {/* Add audio player if audioUrl exists and it's an assistant message */}
                 {message.audioUrl && !isUser && (
                   <div className="flex items-center gap-2 mb-2">
                     <Button
@@ -324,9 +359,13 @@ function Message({ message, onEditMessage }: MessageProps) {
                       className="w-8 h-8 p-0 rounded-full"
                       onClick={toggleAudio}
                     >
-                      {isPlaying ? <MdPause className="w-5 h-5" /> : <MdPlayArrow className="w-5 h-5" />}
+                      {isPlaying ? (
+                        <MdPause className="w-5 h-5" />
+                      ) : (
+                        <MdPlayArrow className="w-5 h-5" />
+                      )}
                     </Button>
-                    <audio 
+                    <audio
                       ref={audioRef}
                       src={message.audioUrl}
                       onEnded={handleAudioEnded}
@@ -338,30 +377,44 @@ function Message({ message, onEditMessage }: MessageProps) {
                     </span>
                   </div>
                 )}
-                <MarkdownRenderer content={message.content} />
+
+                {jsonObject ? (
+                  renderJsonBlock(jsonObject)
+                ) : (
+                  <MarkdownRenderer content={message.content} />
+                )}
               </div>
             )}
-            
+
             <div className="text-xs opacity-50 mt-1 flex items-center gap-2">
               <span>{formatDate(message.createdAt)}</span>
             </div>
           </div>
-          
+
           {isHovered && !isEditing && (
             <div className="absolute -bottom-6 right-2 bg-background/80 backdrop-blur-sm p-1 rounded-sm flex gap-2 shadow-md z-20">
-              <Button 
-                variant="ghost" 
-                size="icon" 
+              <Button
+                variant="ghost"
+                size="icon"
                 className="h-7 w-7 rounded-md"
                 onClick={copyToClipboard}
               >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
-              
+              {isUser && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-md"
+                  onClick={handleEdit}
+                >
+                  ✏️
+                </Button>
+              )}
             </div>
           )}
         </div>
-        
+
         {isUser && (
           <Avatar>
             <AvatarFallback>Ты</AvatarFallback>

@@ -5,54 +5,45 @@ type MessageProps = {
   content: string;
 };
 
-function detectJsonType(obj: any): "payment" | "counterparty" | "unknown" {
-  if ("amount" in obj && "account Recipient" in obj) return "payment";
-  if ("name" in obj && "iin" in obj) return "counterparty";
-  return "unknown";
+// Универсальный рендер JSON-объекта
+function renderJsonBlock(json: Record<string, any>) {
+  return (
+    <div className="rounded-lg border p-4 bg-muted/40 max-w-md mx-auto my-4">
+      <h3 className="text-lg font-semibold mb-2">📦 Данные</h3>
+      {Object.entries(json).map(([key, value]) => (
+        <div key={key}>
+          <strong>{key}:</strong> {String(value)}
+        </div>
+      ))}
+      <Button className="w-full">Подписать</Button>
+    </div>
+  );
 }
 
 export function AssistantMessage({ content }: MessageProps) {
-  const [jsonData, setJsonData] = useState<any | null>(null);
-  const [jsonType, setJsonType] = useState<"payment" | "counterparty" | "unknown">("unknown");
+  const [jsonData, setJsonData] = useState<Record<string, any> | null>(null);
 
   useEffect(() => {
-    const match = content.match(/Final Response:\s*JSON\s*({[\s\S]*?})/i);
-    if (match) {
-      try {
-        const cleanedJson = match[1].replace(/“|”/g, '"'); // replace smart quotes
-        const parsed = JSON.parse(cleanedJson);
+    try {
+      // Удаляем лишние пробелы и символы до JSON (если они есть)
+      const trimmed = content.trim();
+
+      // Попытка сразу распарсить весь контент
+      const cleaned = trimmed.replace(/“|”/g, '"'); // заменяем кавычки
+      const parsed = JSON.parse(cleaned);
+
+      if (typeof parsed === "object" && parsed !== null) {
         setJsonData(parsed);
-        setJsonType(detectJsonType(parsed));
-      } catch (e) {
-        console.warn("Ошибка парсинга JSON:", e);
       }
+    } catch (e) {
+      // Не валидный JSON — ничего не делаем
     }
   }, [content]);
 
-  if (jsonData && jsonType === "payment") {
-    return (
-      <div className="rounded-lg border p-4 bg-muted/40 max-w-md mx-auto my-4">
-        <h3 className="text-lg font-semibold mb-2">💸 Платёж</h3>
-        <div><strong>Сумма:</strong> {jsonData.amount} {jsonData.currency}</div>
-        <div><strong>Описание:</strong> {jsonData.description}</div>
-        <div><strong>Счёт получателя:</strong> {jsonData["account Recipient"]}</div>
-        <Button className="mt-4 w-auto">Подписать платёж</Button>
-      </div>
-    );
+  if (jsonData) {
+    return renderJsonBlock(jsonData);
   }
 
-  if (jsonData && jsonType === "counterparty") {
-    return (
-      <div className="rounded-lg border p-4 bg-muted/40 max-w-md mx-auto my-4">
-        <h3 className="text-lg font-semibold mb-2">📋 Контрагент</h3>
-        <div><strong>Имя:</strong> {jsonData.name}</div>
-        <div><strong>IIN:</strong> {jsonData.iin}</div>
-        <div><strong>IBAN:</strong> {jsonData.iban}</div>
-        <Button className="mt-4 w-auto">Добавить контрагента</Button>
-      </div>
-    );
-  }
-
-  // Если нет JSON — показываем обычное сообщение
+  // Если не JSON — просто текст
   return <p className="whitespace-pre-line">{content}</p>;
 }
