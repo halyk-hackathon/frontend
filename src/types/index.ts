@@ -15,6 +15,9 @@ export type Message = {
   modelB?: string;
   providerA?: Provider;
   providerB?: Provider;
+    meta?: {
+    parsedJson?: any; // 👈 добавили поле для структурированных данных
+  };
 };
 
 export type Conversation = {

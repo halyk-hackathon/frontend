@@ -221,8 +221,23 @@ export function MessageInput({ className, arenaMode }: MessageInputProps) {
         const content =
           nonStreamResponse.choices?.[0]?.message?.content ||
           "Нет ответа от Халык Автопилот";
+        const finalResponseMatch = content.match(
+          /Final Response:\s*JSON\s*({[\s\S]*?})/i
+        );
 
-        const cleaned = cleanAndFixText(content);
+        let parsedJson = null;
+        let displayText = content;
+
+        if (finalResponseMatch) {
+          try {
+            parsedJson = JSON.parse(finalResponseMatch[1].replace(/“|”/g, '"'));
+            displayText = content.replace(finalResponseMatch[0], "").trim();
+          } catch (e) {
+            console.warn("Ошибка парсинга JSON:", e);
+          }
+        }
+
+        const cleaned = cleanAndFixText(displayText);
 
         const assistantMessage = {
           id: generateId(),
@@ -230,6 +245,7 @@ export function MessageInput({ className, arenaMode }: MessageInputProps) {
           content: cleaned,
           createdAt: new Date(),
           tokenCount: cleaned.trim().split(/\s+/).length,
+          meta: parsedJson ? { parsedJson } : undefined, // 👈 сохраняем JSON в meta
         };
 
         setConversations((prev) =>
@@ -278,166 +294,167 @@ export function MessageInput({ className, arenaMode }: MessageInputProps) {
       stopStreaming();
     }
   };
-const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  setIsSubmitting(true);
-  setIsReasoning(true);
+    setIsSubmitting(true);
+    setIsReasoning(true);
 
-  const userMessage = `📎 Пользователь загрузил файл: ${file.name}`;
+    const userMessage = `📎 Пользователь загрузил файл: ${file.name}`;
 
-  const userMessageObj = {
-    id: generateId(),
-    role: "user" as const,
-    content: userMessage,
-    createdAt: new Date(),
-    tokenCount: userMessage.trim().split(/\s+/).length,
-  };
-
-  // Добавим сообщение в чат
-  setConversations((prev) =>
-    prev.map((conv) =>
-      conv.id === currentConversationId
-        ? {
-            ...conv,
-            messages: [...conv.messages, userMessageObj],
-            updatedAt: new Date(),
-          }
-        : conv
-    )
-  );
-
-  // Очистим input
-  e.target.value = "";
-
-  try {
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const uploadResponse = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!uploadResponse.ok) {
-      throw new Error("Не удалось загрузить файл");
-    }
-
-    const result = await uploadResponse.json();
-
-    // Можно отправить assistant-ответ
-    const assistantMessage = {
+    const userMessageObj = {
       id: generateId(),
-      role: "assistant" as const,
-      content: `Файл "${file.name}" успешно обработан. ${result.message || ""}`,
+      role: "user" as const,
+      content: userMessage,
       createdAt: new Date(),
-      tokenCount: result.message?.split(/\s+/).length || 0,
+      tokenCount: userMessage.trim().split(/\s+/).length,
     };
 
+    // Добавим сообщение в чат
     setConversations((prev) =>
       prev.map((conv) =>
         conv.id === currentConversationId
           ? {
               ...conv,
-              messages: [...conv.messages, assistantMessage],
+              messages: [...conv.messages, userMessageObj],
               updatedAt: new Date(),
             }
           : conv
       )
     );
-  } catch (error: any) {
-    console.error(error);
-    toast({
-      title: "Ошибка при загрузке файла",
-      description: error.message || "Попробуйте позже",
-      variant: "destructive",
-    });
-  } finally {
-    setIsSubmitting(false);
-    setIsReasoning(false);
-  }
-};
+
+    // Очистим input
+    e.target.value = "";
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadResponse = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Не удалось загрузить файл");
+      }
+
+      const result = await uploadResponse.json();
+
+      // Можно отправить assistant-ответ
+      const assistantMessage = {
+        id: generateId(),
+        role: "assistant" as const,
+        content: `Файл "${file.name}" успешно обработан. ${
+          result.message || ""
+        }`,
+        createdAt: new Date(),
+        tokenCount: result.message?.split(/\s+/).length || 0,
+      };
+
+      setConversations((prev) =>
+        prev.map((conv) =>
+          conv.id === currentConversationId
+            ? {
+                ...conv,
+                messages: [...conv.messages, assistantMessage],
+                updatedAt: new Date(),
+              }
+            : conv
+        )
+      );
+    } catch (error: any) {
+      console.error(error);
+      toast({
+        title: "Ошибка при загрузке файла",
+        description: error.message || "Попробуйте позже",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+      setIsReasoning(false);
+    }
+  };
 
   return (
     <form
       onSubmit={handleSubmit}
       className="border-t p-4 bg-background/80 backdrop-blur-sm"
     >
-    <div className="relative flex items-center">
-  <Textarea
-    ref={textareaRef}
-    value={message}
-    onChange={(e) => setMessage(e.target.value)}
-    onKeyDown={(e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit(e);
-      }
-    }}
-    placeholder={
-      isReasoning
-        ? "Халык Автопилот размышляет..."
-        : isInputDisabled
-        ? "Обработка голосового сообщения..."
-        : "Введите ваше сообщение..."
-    }
-    className="pr-14 min-h-[60px] max-h-[200px] resize-none"
-    disabled={isSubmitting || isReasoning || isInputDisabled}
-  />
-
-  {isReasoning ? (
-    <div className="absolute right-2 flex items-center justify-center">
-      {isStreaming ? (
-        <Button
-          type="button"
-          size="icon"
-          variant="destructive"
-          className="h-8 w-8"
-          onClick={() => stopStreaming()}
-          title="Остановить генерацию"
-        >
-          <Square className="h-4 w-4" />
-          <span className="sr-only">Остановить</span>
-        </Button>
-      ) : (
-        <div className="h-8 w-8 flex items-center justify-center">
-          <div className="animate-pulse h-4 w-4 bg-primary rounded-full"></div>
-        </div>
-      )}
-    </div>
-  ) : (
-    <div className="absolute right-2 flex items-center space-x-2">
-      {/* Загрузка файла */}
-      <label className="cursor-pointer">
-        <input
-          type="file"
-          className="hidden"
-          onChange={handleFileUpload}
+      <div className="relative flex items-center">
+        <Textarea
+          ref={textareaRef}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSubmit(e);
+            }
+          }}
+          placeholder={
+            isReasoning
+              ? "Халык Автопилот размышляет..."
+              : isInputDisabled
+              ? "Обработка голосового сообщения..."
+              : "Введите ваше сообщение..."
+          }
+          className="pr-14 min-h-[60px] max-h-[200px] resize-none"
           disabled={isSubmitting || isReasoning || isInputDisabled}
         />
-        <Paperclip className="h-5 w-5 text-muted-foreground hover:text-foreground" />
-      </label>
 
-      <AudioRecordButton />
+        {isReasoning ? (
+          <div className="absolute right-2 flex items-center justify-center">
+            {isStreaming ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="destructive"
+                className="h-8 w-8"
+                onClick={() => stopStreaming()}
+                title="Остановить генерацию"
+              >
+                <Square className="h-4 w-4" />
+                <span className="sr-only">Остановить</span>
+              </Button>
+            ) : (
+              <div className="h-8 w-8 flex items-center justify-center">
+                <div className="animate-pulse h-4 w-4 bg-primary rounded-full"></div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="absolute right-2 flex items-center space-x-2">
+            {/* Загрузка файла */}
+            <label className="cursor-pointer">
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleFileUpload}
+                disabled={isSubmitting || isReasoning || isInputDisabled}
+              />
+              <Paperclip className="h-5 w-5 text-muted-foreground hover:text-foreground" />
+            </label>
 
-      <Button
-        type="submit"
-        size="icon"
-        disabled={
-          isSubmitting ||
-          isReasoning ||
-          !message.trim() ||
-          isInputDisabled
-        }
-      >
-        <SendHorizontal className="h-5 w-5" />
-        <span className="sr-only">Отправить</span>
-      </Button>
-    </div>
-  )}
-</div>
+            <AudioRecordButton />
 
+            <Button
+              type="submit"
+              size="icon"
+              disabled={
+                isSubmitting ||
+                isReasoning ||
+                !message.trim() ||
+                isInputDisabled
+              }
+            >
+              <SendHorizontal className="h-5 w-5" />
+              <span className="sr-only">Отправить</span>
+            </Button>
+          </div>
+        )}
+      </div>
     </form>
   );
 }

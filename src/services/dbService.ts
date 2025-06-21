@@ -1,10 +1,10 @@
-import { v4 as uuidv4 } from 'uuid';
-import { Conversation, Message } from '@/types';
+import { v4 as uuidv4 } from "uuid";
+import { Conversation, Message } from "@/types";
 
 // Convert Prisma Message to app Message type
 const convertPrismaMessage = (prismaMessage: any): Message => ({
   id: prismaMessage.id,
-  role: prismaMessage.role as 'user' | 'assistant' | 'system',
+  role: prismaMessage.role as "user" | "assistant" | "system",
   content: prismaMessage.content,
   createdAt: new Date(prismaMessage.createdAt),
   modelA: prismaMessage.modelA,
@@ -25,15 +25,23 @@ const convertPrismaConversation = (prismaConversation: any): Conversation => ({
 
 // Get all conversations from localStorage
 export const getConversations = async (): Promise<Conversation[]> => {
-  const conversations = JSON.parse(localStorage.getItem('conversations') || '[]');
+  const conversations = JSON.parse(
+    localStorage.getItem("conversations") || "[]"
+  );
   return conversations.map(convertPrismaConversation);
 };
 
 // Get a single conversation by ID from localStorage
-export const getConversation = async (id: string): Promise<Conversation | null> => {
-  const conversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-  const conversation = conversations.find((conv: Conversation) => conv.id === id);
-  
+export const getConversation = async (
+  id: string
+): Promise<Conversation | null> => {
+  const conversations = JSON.parse(
+    localStorage.getItem("conversations") || "[]"
+  );
+  const conversation = conversations.find(
+    (conv: Conversation) => conv.id === id
+  );
+
   return conversation ? convertPrismaConversation(conversation) : null;
 };
 
@@ -41,7 +49,7 @@ export const getConversation = async (id: string): Promise<Conversation | null> 
 export const createConversation = async (
   title: string,
   isArena: boolean = false,
-  initialMessage?: Message,
+  initialMessage?: Message
 ): Promise<Conversation> => {
   const newConversation: Conversation = {
     id: uuidv4(),
@@ -52,19 +60,23 @@ export const createConversation = async (
     updatedAt: new Date(),
   };
 
-  const conversations = JSON.parse(localStorage.getItem('conversations') || '[]');
+  const conversations = JSON.parse(
+    localStorage.getItem("conversations") || "[]"
+  );
   conversations.push(newConversation);
-  localStorage.setItem('conversations', JSON.stringify(conversations));
+  localStorage.setItem("conversations", JSON.stringify(conversations));
 
   // 💡 Устанавливаем текущий ID
-  localStorage.setItem('currentConversationId', newConversation.id);
+  localStorage.setItem("currentConversationId", newConversation.id);
 
   return newConversation;
 };
 
-
 // Add a message to a conversation in localStorage
-export function addMessage(role: 'user' | 'assistant' | 'system', content: string) {
+export function addMessage(
+  role: "user" | "assistant" | "system",
+  content: string
+) {
   if (!content?.trim()) return; // <-- защита от null / пустых
 
   const message: Message = {
@@ -91,31 +103,41 @@ export function addMessage(role: 'user' | 'assistant' | 'system', content: strin
   );
 }
 
-
 // Update conversation title in localStorage
-export const updateConversationTitle = async (id: string, title: string): Promise<Conversation> => {
-  const conversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-  const conversation = conversations.find((conv: Conversation) => conv.id === id);
+export const updateConversationTitle = async (
+  id: string,
+  title: string
+): Promise<Conversation> => {
+  const conversations = JSON.parse(
+    localStorage.getItem("conversations") || "[]"
+  );
+  const conversation = conversations.find(
+    (conv: Conversation) => conv.id === id
+  );
 
-  if (!conversation) throw new Error('Conversation not found');
+  if (!conversation) throw new Error("Conversation not found");
 
   conversation.title = title;
   conversation.updatedAt = new Date();
 
-  localStorage.setItem('conversations', JSON.stringify(conversations));
-  
+  localStorage.setItem("conversations", JSON.stringify(conversations));
+
   return convertPrismaConversation(conversation);
 };
 
 // Delete a conversation from localStorage
 export const deleteConversation = async (id: string): Promise<void> => {
-  const conversations = JSON.parse(localStorage.getItem('conversations') || '[]');
-  const updatedConversations = conversations.filter((conv: Conversation) => conv.id !== id);
-  
-  localStorage.setItem('conversations', JSON.stringify(updatedConversations));
+  const conversations = JSON.parse(
+    localStorage.getItem("conversations") || "[]"
+  );
+  const updatedConversations = conversations.filter(
+    (conv: Conversation) => conv.id !== id
+  );
+
+  localStorage.setItem("conversations", JSON.stringify(updatedConversations));
 };
 
 // Delete all conversations from localStorage
 export const deleteAllConversations = async (): Promise<void> => {
-  localStorage.removeItem('conversations');
+  localStorage.removeItem("conversations");
 };
