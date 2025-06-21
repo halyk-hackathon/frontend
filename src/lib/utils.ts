@@ -191,7 +191,7 @@ export async function* streamChatResponse(
   stream: ReadableStream<Uint8Array>
 ): AsyncGenerator<string, void, unknown> {
   const reader = stream.getReader();
-  const decoder = new TextDecoder();
+  const decoder = new TextDecoder('utf-8');
   let partialLine = '';
   let fullText = '';
 
@@ -207,10 +207,12 @@ export async function* streamChatResponse(
       partialLine = lines.pop() || '';
 
       for (const line of lines) {
-        const cleanedLine = line.replace(/^data:\s*/, '').trim();
-        if (!cleanedLine || cleanedLine === '[DONE]') continue;
+        if (line.startsWith("data:")) {
+          const text = line.substring(5)
+          fullText += text;
+        }
 
-        fullText += cleanedLine;
+        
       }
     }
 
