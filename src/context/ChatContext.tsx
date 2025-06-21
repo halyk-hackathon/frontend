@@ -144,7 +144,7 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     };
     
     const newConversation = await dbService.createConversation(
-      'New Conversation',
+      'Новый чат',
       isArena,
       firstMessage
     );
@@ -209,8 +209,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     }
     
     toast({
-      title: "Conversation deleted",
-      description: "The conversation has been removed",
+      title: "Чат удален",
+      description: "Чат был удален.",
     });
   }, [conversations, currentConversationId, createNewConversation, toast]);
   
@@ -220,8 +220,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     await createNewConversation(undefined, false);
     
     toast({
-      title: "All conversations cleared",
-      description: "A new conversation has been created",
+      title: "Все чаты очищены",
+      description: "Создан новый чат.",
     });
   }, [createNewConversation, toast]);
   
@@ -265,8 +265,8 @@ export const ChatProvider = ({ children }: { children: React.ReactNode }) => {
     );
     
     toast({
-      title: "Conversation renamed",
-      description: "The conversation has been renamed",
+      title: "Чат переименован",
+      description: "Чат был переименован",
     });
   }, [toast]);
 

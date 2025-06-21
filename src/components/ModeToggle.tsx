@@ -14,8 +14,8 @@ export function ModeToggle() {
     updateTheme(settings.template, newDarkMode);
     
     toast({
-      title: newDarkMode ? "Dark Mode Enabled" : "Light Mode Enabled",
-      description: `Theme has been updated.`,
+      title: newDarkMode ? "Включен темный режим" : "Включен светлый режим",
+      description: `Тема обновлена.`,
     });
   };
   
@@ -24,14 +24,14 @@ export function ModeToggle() {
       variant="ghost"
       size="icon"
       onClick={toggleDarkMode}
-      aria-label="Toggle dark mode"
+      aria-label="Включить темный режим"
     >
       {settings.darkMode ? (
         <Moon className="h-5 w-5 transition-all" />
       ) : (
         <Sun className="h-5 w-5 transition-all" />
       )}
-      <span className="sr-only">Toggle dark mode</span>
+      <span className="sr-only">Включить темный режим</span>
     </Button>
   );
 }

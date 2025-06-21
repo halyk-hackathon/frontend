@@ -3,30 +3,28 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useChat } from "@/context/ChatContext";
 import { sendChatRequest } from "@/services/apiService";
-import { streamChatResponse } from "@/lib/utils";
+import { streamChatResponse, generateId } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { SendHorizontal, Square } from "lucide-react";
 import { ChatResponse } from "@/types";
-import { generateId } from "@/lib/utils";
 import { AudioRecordButton } from "@/components/AudioRecordButton";
 
-// Arena Mode Configuration
 const CHAT_ARENA_ENABLED = import.meta.env.VITE_CHAT_ARENA_ENABLED === 'true';
 
 interface MessageInputProps {
   className?: string;
-  arenaMode?: boolean; // Add arenaMode prop
+  arenaMode?: boolean;
 }
 
-export function MessageInput({ className, arenaMode }: MessageInputProps) { // Destructure arenaMode
+export function MessageInput({ className, arenaMode }: MessageInputProps) {
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReasoning, setIsReasoning] = useState(false);
-  const { 
-    addMessage, 
-    settings, 
-    conversations, 
-    currentConversationId, 
+  const {
+    addMessage,
+    settings,
+    conversations,
+    currentConversationId,
     setConversations,
     isStreaming,
     startStreaming,
@@ -50,144 +48,129 @@ export function MessageInput({ className, arenaMode }: MessageInputProps) { // D
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    
+
     if (!message.trim() || isSubmitting || !currentConversationId) return;
-    
-    // Add user message
+
     addMessage("user", message);
-    
-    // Prepare for API call
     setIsSubmitting(true);
     setIsReasoning(true);
     setMessage("");
-    
+
+    let responseHandled = false;
+
     try {
-      // Prepare messages array with system prompt if available
       const messages = [];
-      
-      // Add system prompt if it exists
+
       if (settings.systemPrompt && settings.systemPrompt.trim() !== '') {
         messages.push({ role: "system", content: settings.systemPrompt });
       }
-      
-      // Add conversation history
+
       messages.push(
         ...(currentConversation?.messages.map(m => ({
           role: m.role,
           content: m.content
         })) || [])
       );
-      
-      // Add current user message
+
       messages.push({ role: "user", content: message });
 
-      
       const chatRequest = {
         messages,
         model: settings.model,
         temperature: settings.temperature,
         stream: settings.streamEnabled
       };
-      
-      // Send request with proper typing
+
       const response = await sendChatRequest(settings.provider, chatRequest);
-      
+
       if (settings.streamEnabled && response instanceof ReadableStream) {
-        // Handle streaming response
         let responseContent = '';
-        
-        // Create a new assistant message
+
         const assistantMessage = {
           id: generateId(),
           role: 'assistant' as const,
           content: '',
           createdAt: new Date(),
-          tokenCount: 0 // Initialize token count
+          tokenCount: 0
         };
-        
-        // Add the empty message that will be updated with streaming content
-        setConversations(prev => 
-          prev.map(conv => 
-            conv.id === currentConversationId 
+
+        setConversations(prev =>
+          prev.map(conv =>
+            conv.id === currentConversationId
               ? {
                   ...conv,
                   messages: [...conv.messages, assistantMessage],
                   updatedAt: new Date()
-                } 
+                }
               : conv
           )
         );
-        
-        // Start streaming and get the controller for cancellation
+
         const controller = startStreaming();
-        
+
         try {
-          // Stream the response and update the message
           const stream = streamChatResponse(response);
-          
+
           for await (const chunk of stream) {
-            // Check if streaming was cancelled
-            if (controller.signal.aborted) {
-              break;
-            }
-            
+            if (controller.signal.aborted) break;
+
             responseContent += chunk;
-            
-            // Update the message with the current content and recalculate token count
+
             const words = responseContent
               .trim()
-              .split(/\s+|[!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~]/) 
+              .split(/\s+|[!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~]/)
               .filter(word => word.length > 0);
-            
-            setConversations(prev => 
-              prev.map(conv => 
-                conv.id === currentConversationId 
+
+            setConversations(prev =>
+              prev.map(conv =>
+                conv.id === currentConversationId
                   ? {
                       ...conv,
-                      messages: conv.messages.map(msg => 
+                      messages: conv.messages.map(msg =>
                         msg.id === assistantMessage.id
-                          ? { 
-                              ...msg, 
+                          ? {
+                              ...msg,
                               content: responseContent,
-                              tokenCount: words.length 
+                              tokenCount: words.length
                             }
                           : msg
                       ),
                       updatedAt: new Date()
-                    } 
+                    }
                   : conv
               )
             );
           }
+
+          responseHandled = true;
         } catch (error) {
           if (error.name !== 'AbortError') {
             throw error;
           }
-          // If it's an AbortError, we just stop the streaming gracefully
-          console.log('Streaming was cancelled by user');
+          console.log('Поток отменён пользователем');
         }
       } else if (!settings.streamEnabled && !(response instanceof ReadableStream)) {
-        // Handle non-streaming response
         const nonStreamResponse = response as ChatResponse;
-        const responseContent = nonStreamResponse.choices[0]?.message?.content || "No response from AI";
-        
-        // Add the complete response as a new message
+        const responseContent =
+          nonStreamResponse.choices[0]?.message?.content || "Нет ответа от Халык Автопилот";
         addMessage("assistant", responseContent);
+        responseHandled = true;
       }
     } catch (error) {
-      console.error("Error sending message:", error);
+      console.error("Ошибка при отправке сообщения:", error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to send message",
-        variant: "destructive",
+        title: "Ошибка",
+        description: error instanceof Error ? error.message : "Не удалось отправить сообщение",
+        variant: "destructive"
       });
-      
-      // Add an error message
-      addMessage("assistant", "Sorry, I encountered an error. Please try again.");
+
+      if (!responseHandled) {
+        addMessage("assistant", "Произошла ошибка. Пожалуйста, попробуйте снова.");
+      }
     } finally {
       setIsSubmitting(false);
       setIsReasoning(false);
-      stopStreaming(); // Ensure streaming state is reset
+      stopStreaming();
     }
   };
 
@@ -204,23 +187,27 @@ export function MessageInput({ className, arenaMode }: MessageInputProps) { // D
               handleSubmit(e);
             }
           }}
-          placeholder={isReasoning ? "AI is reasoning..." : isInputDisabled ? "Processing voice message..." : "Type your message..."}
+          placeholder={isReasoning
+            ? "Халык Автопилот размышляет..."
+            : isInputDisabled
+              ? "Обработка голосового сообщения..."
+              : "Введите ваше сообщение..."}
           className="pr-14 min-h-[60px] max-h-[200px] resize-none"
           disabled={isSubmitting || isReasoning || isInputDisabled}
         />
         {isReasoning ? (
           <div className="absolute right-2 flex items-center justify-center">
             {isStreaming ? (
-              <Button 
-                type="button" 
-                size="icon" 
+              <Button
+                type="button"
+                size="icon"
                 variant="destructive"
-                className="h-8 w-8" 
+                className="h-8 w-8"
                 onClick={() => stopStreaming()}
-                title="Stop generation"
+                title="Остановить генерацию"
               >
                 <Square className="h-4 w-4" />
-                <span className="sr-only">Stop</span>
+                <span className="sr-only">Остановить</span>
               </Button>
             ) : (
               <div className="h-8 w-8 flex items-center justify-center">
@@ -237,16 +224,8 @@ export function MessageInput({ className, arenaMode }: MessageInputProps) { // D
               disabled={isSubmitting || isReasoning || !message.trim() || isInputDisabled}
             >
               <SendHorizontal className="h-5 w-5" />
-              <span className="sr-only">Send</span>
+              <span className="sr-only">Отправить</span>
             </Button>
-          </div>
-        )}
-      </div>
-      
-      <div className="flex justify-center items-center mt-2">
-        {!arenaMode && (
-          <div className="text-xs text-muted-foreground">
-            AI Powered by {`${settings.provider}/${settings.model}`}
           </div>
         )}
       </div>

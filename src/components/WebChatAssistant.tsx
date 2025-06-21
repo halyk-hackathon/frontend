@@ -1,38 +1,54 @@
-import { useState, useEffect } from 'react';
-import { X, Settings, Globe, Volume2, VolumeX } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { useChat } from '@/context/ChatContext';
-import { MessageList } from '@/components/MessageList';
-import { MessageInput } from '@/components/MessageInput';
-import { Logo } from './Logo';
-import { ModeToggle } from './ModeToggle';
-import { SettingsDialog } from './SettingsDialog';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useState, useEffect } from "react";
+import { X, Settings, Globe, Volume2, VolumeX } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import { useChat } from "@/context/ChatContext";
+import { MessageList } from "@/components/MessageList";
+import { MessageInput } from "@/components/MessageInput";
+import { Logo } from "./Logo";
+import { ModeToggle } from "./ModeToggle";
+import { SettingsDialog } from "./SettingsDialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
-const BOXED_CHAT_UI = import.meta.env.VITE_BOXED_CHATBUBBLE_MODE_ENABLED === 'true';
+const BOXED_CHAT_UI =
+  import.meta.env.VITE_BOXED_CHATBUBBLE_MODE_ENABLED === "true";
 
 const WebChatAssistant: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
-  const { 
-    conversations, 
-    currentConversationId, 
-    createNewConversation, 
+  const {
+    conversations,
+    currentConversationId,
+    createNewConversation,
     selectConversation,
     settings,
     toggleWebSearch,
-    toggleAudioResponse
+    toggleAudioResponse,
   } = useChat();
 
   useEffect(() => {
     setIsMounted(true);
     if (BOXED_CHAT_UI && !currentConversationId && conversations.length === 0) {
       createNewConversation();
-    } else if (BOXED_CHAT_UI && !currentConversationId && conversations.length > 0) {
+    } else if (
+      BOXED_CHAT_UI &&
+      !currentConversationId &&
+      conversations.length > 0
+    ) {
       selectConversation(conversations[0].id);
     }
-  }, [BOXED_CHAT_UI, currentConversationId, conversations, createNewConversation, selectConversation]);
+  }, [
+    BOXED_CHAT_UI,
+    currentConversationId,
+    conversations,
+    createNewConversation,
+    selectConversation,
+  ]);
 
   if (!BOXED_CHAT_UI || !isMounted) {
     return null;
@@ -57,10 +73,14 @@ const WebChatAssistant: React.FC = () => {
       )}
 
       {isOpen && (
-        <div className={cn(
-          "fixed bottom-24 right-6 z-40 w-[500px] h-[750px] bg-background border border-border rounded-lg shadow-xl flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
-          isOpen ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"
-        )}>
+        <div
+          className={cn(
+            "fixed bottom-24 right-6 z-40 w-[500px] h-[750px] bg-background border border-border rounded-lg shadow-xl flex flex-col overflow-hidden transition-all duration-300 ease-in-out",
+            isOpen
+              ? "opacity-100 translate-y-0"
+              : "opacity-0 translate-y-10 pointer-events-none"
+          )}
+        >
           <header className="flex items-center justify-between p-3 border-b bg-background">
             <div className="flex items-center space-x-2">
               <Logo />
@@ -75,13 +95,27 @@ const WebChatAssistant: React.FC = () => {
                       size="icon"
                       onClick={toggleWebSearch}
                       aria-label="Toggle web search"
-                      className={cn("h-8 w-8", settings.webSearchEnabled ? "text-primary" : "text-muted-foreground hover:text-foreground")}
+                      className={cn(
+                        "h-8 w-8",
+                        settings.webSearchEnabled
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
                     >
-                      <Globe className={cn("h-4 w-4", settings.webSearchEnabled ? "animate-pulse-icon" : "")} />
+                      <Globe
+                        className={cn(
+                          "h-4 w-4",
+                          settings.webSearchEnabled ? "animate-pulse-icon" : ""
+                        )}
+                      />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
-                    <p>{settings.webSearchEnabled ? "Disable web search" : "Enable web search"}</p>
+                    <p>
+                      {settings.webSearchEnabled
+                        ? "Disable web search"
+                        : "Enable web search"}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -93,23 +127,40 @@ const WebChatAssistant: React.FC = () => {
                       size="icon"
                       onClick={toggleAudioResponse}
                       aria-label="Toggle audio responses"
-                      className={cn("h-8 w-8", settings.audioResponseEnabled ? "text-primary" : "text-muted-foreground hover:text-foreground")}
+                      className={cn(
+                        "h-8 w-8",
+                        settings.audioResponseEnabled
+                          ? "text-primary"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
                     >
                       {settings.audioResponseEnabled ? (
-                        <Volume2 className={cn("h-4 w-4", "animate-pulse-icon")} />
+                        <Volume2
+                          className={cn("h-4 w-4", "animate-pulse-icon")}
+                        />
                       ) : (
                         <VolumeX className="h-4 w-4" />
                       )}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
-                    <p>{settings.audioResponseEnabled ? "Disable automatic audio playback" : "Enable automatic audio playback"}</p>
+                    <p>
+                      {settings.audioResponseEnabled
+                        ? "Disable automatic audio playback"
+                        : "Enable automatic audio playback"}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
               <ModeToggle />
-              <SettingsDialog /> 
-              <Button variant="ghost" size="icon" onClick={toggleChat} aria-label="Close chat" className="h-8 w-8">
+              <SettingsDialog />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleChat}
+                aria-label="Close chat"
+                className="h-8 w-8"
+              >
                 <X size={20} />
               </Button>
             </div>
@@ -125,17 +176,18 @@ const WebChatAssistant: React.FC = () => {
             )}
           </div>
           {currentConversation && <MessageInput />}
-          <footer className="py-3 px-4 text-center text-xs text-muted-foreground border-t bg-background">
-            <div>
-              <a 
-                href="https://meetneura.ai" 
-                target="_blank" 
+          <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+            <p>
+              Halyk Autopilot — AI-сервис для бизнеса от{" "}
+              <a
+                href="https://halykbank.kz"
+                target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-primary transition-colors"
+                className="underline"
               >
-                Powered by Neura AI
+                Халык Банка
               </a>
-            </div>
+            </p>
           </footer>
         </div>
       )}
